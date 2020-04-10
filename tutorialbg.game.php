@@ -362,7 +362,7 @@ class tutorialbg extends Table
                 $sql = "UPDATE player SET player_score=player_score-$points  WHERE player_id='$player_id'";
                 self::DbQuery($sql);
                 $heart_number = $player_to_points [$player_id];
-                self::notifyAllPlayers("points", clienttranslate('${player_name} gets ${nbr} hearts and looses ${nbr} points'), array (
+                self::notifyAllPlayers("points", clienttranslate('${player_name} gets ${nbr} hearts and loses ${nbr} points'), array (
                         'player_id' => $player_id,'player_name' => $players [$player_id] ['player_name'],
                         'nbr' => $heart_number ));
             } else {
