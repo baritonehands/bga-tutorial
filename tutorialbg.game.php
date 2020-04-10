@@ -103,15 +103,7 @@ class tutorialbg extends Table
             }
         }
         
-        $this->cards->createCards( $cards, 'deck' );
-
-        // Shuffle deck
-        $this->cards->shuffle('deck');
-        // Deal 13 cards to each players
-        $players = self::loadPlayersBasicInfos();
-        foreach ( $players as $player_id => $player ) {
-            $cards = $this->cards->pickCards(13, 'deck', $player_id);
-        } 
+        $this->cards->createCards( $cards, 'deck' ); 
 
         // Init global values with their initial values
         //self::setGameStateInitialValue( 'my_first_global_variable', 0 );
@@ -185,6 +177,26 @@ class tutorialbg extends Table
         In this space, you can put any utility methods useful for your game logic
     */
 
+    function playerMustFollowSuit($player_id, $color) {
+        $cards = $this->cards->getCardsInLocation('hand', $player_id);
+        foreach ($cards as $card) {
+            if($card['type'] == $color) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function playerHasOnlyHearts($player_id) {
+        $cards = $this->cards->getCardsInLocation('hand', $player_id);
+        foreach ($cards as $card) {
+            if($card['type'] != 2) {
+                return false;
+            }
+        }
+        return true;
+    }
+
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -199,12 +211,23 @@ class tutorialbg extends Table
     function playCard($card_id) {
         self::checkAction("playCard");
         $player_id = self::getActivePlayerId();
-        $this->cards->moveCard($card_id, 'cardsontable', $player_id);
         // XXX check rules here
         $currentCard = $this->cards->getCard($card_id);
-        $currentTrickColor = self::getGameStateValue( 'trickColor' ) ;
-        if( $currentTrickColor == 0 )
+        $currentTrickColor = self::getGameStateValue( 'trickColor' );
+        $heartsBroken = self::getGameStateValue( 'alreadyPlayedHearts' );
+        $followSuit = $currentTrickColor == 0 || self::playerMustFollowSuit($player_id, $currentTrickColor);
+        if( $currentTrickColor == 0 ) {
             self::setGameStateValue( 'trickColor', $currentCard['type'] );
+        } elseif( $followSuit && $currentTrickColor != $currentCard['type'] ) {
+            throw new BgaUserException(self::_('You must follow suit'));
+        }
+        if( $currentCard['type'] == 2 ) {
+            if ($heartsBroken != 0 || !$followSuit || self::playerHasOnlyHearts($player_id))
+                self::setGameStateValue( 'alreadyPlayedHearts', 1 );
+            else
+                throw new BgaUserException(self::_('Hearts have not been broken'));
+        }
+        $this->cards->moveCard($card_id, 'cardsontable', $player_id);
         // And notify
         self::notifyAllPlayers('playCard', clienttranslate('${player_name} plays ${value_displayed} ${color_displayed}'), array (
                 'i18n' => array ('color_displayed','value_displayed' ),'card_id' => $card_id,'player_id' => $player_id,
@@ -329,6 +352,8 @@ class tutorialbg extends Table
             // Note: 2 = heart
             if ($card ['type'] == 2) {
                 $player_to_points [$player_id] ++;
+            } elseif ($card['type'] == 1 && $card['type_arg'] == 12) {
+                $player_to_points [$player_id] += 13;
             }
         }
         // Apply scores to player
